@@ -1,5 +1,5 @@
 #!/bin/bash
-# zol2o - Pro Version (Optimized for Blocksy & Global Search)
+# Bzz - Pro Version
 LOGIN_REDIRECT_URL=""
 REGISTER_REDIRECT_URL=""
 NEW_CONTACT_URL=""
@@ -60,19 +60,36 @@ while read -r config_path; do
         echo "------------------------------------------------" | tee -a "$LOG_FILE"
         echo "[$CURRENT_INDEX/$TOTAL_SITES] Site: $DOMAIN ($DISPLAY_NAME)" | tee -a "$LOG_FILE"
 
+        # --- ฟังก์ชันใหม่: เช็คและอัปเดต Blocksy Theme แบบรอจนเสร็จ ---
+        echo "    [UPDATE] Checking Blocksy theme status..." | tee -a "$LOG_FILE"
+        
+        # เช็คก่อนว่าเว็บนี้ติดตั้ง Blocksy ไว้หรือไม่
+        if wp theme is-installed blocksy --allow-root 2>/dev/null; then
+            # สั่งอัปเดต และเก็บผลลัพธ์ไว้ตรวจสอบ (สคริปต์จะหยุดรอจนกว่าบรรทัดนี้จะทำงานเสร็จ)
+            UPDATE_RESULT=$(wp theme update blocksy --allow-root 2>&1)
+            echo "$UPDATE_RESULT" >> "$LOG_FILE"
+            
+            if echo "$UPDATE_RESULT" | grep -q "Success"; then
+                echo "    [OK] Blocksy theme updated successfully." | tee -a "$LOG_FILE"
+            elif echo "$UPDATE_RESULT" | grep -q "is already at the latest version"; then
+                echo "    [OK] Blocksy theme is already up to date." | tee -a "$LOG_FILE"
+            else
+                echo "    [WARN] Blocksy update encountered an issue. Check log." | tee -a "$LOG_FILE"
+            fi
+        else
+            echo "    [SKIP] Blocksy theme is not installed on this site." | tee -a "$LOG_FILE"
+        fi
+
         # --- ฟังก์ชัน 1: อัปเดตลิงก์ในหน้า Page (Content) ---
         update_page_link() {
             local slug=$1; local new_url=$2; local label=$3
             
-            # แก้ไข: ใช้ความสามารถของ WP-CLI ดึง ID ตรงๆ ด้วย --name (ชัวร์กว่าไปนั่ง grep ตัด string)
             local page_id=$(wp post list --post_type=page --name="$slug" --format=ids --allow-root 2>/dev/null)
             
             if [ -n "$page_id" ]; then
                 local old_content=$(wp post get "$page_id" --field=post_content --allow-root)
                 
-                # แก้ไข: ใช้ Regex เช็คว่ามีแท็ก <a> ที่มี href อยู่หรือไม่ (รองรับกรณีมี class คั่นกลาง)
                 if echo "$old_content" | grep -Eq "<a[^>]+href="; then
-                    # แก้ไข: เปลี่ยนเฉพาะค่าใน href="..." โดยไม่ทำลายแอตทริบิวต์อื่น
                     local new_content=$(echo "$old_content" | sed -E "s|href=\"[^\"]*\"|href=\"$new_url\"|g")
                     wp post update "$page_id" --post_content="$new_content" --allow-root >> "$LOG_FILE" 2>&1
                     echo "    [OK] Page: $label ($slug) updated" | tee -a "$LOG_FILE"
@@ -106,14 +123,13 @@ while read -r config_path; do
             fi
         }
 
-        # เริ่มต้นการทำงานตามเงื่อนไข
+        # เริ่มต้นการทำงานตามเงื่อนไข (ทำหลังจากอัปเดตธีมเสร็จแล้ว)
         [ -n "$LOGIN_REDIRECT_URL" ] && update_page_link "login" "$LOGIN_REDIRECT_URL" "Login"
         [ -n "$REGISTER_REDIRECT_URL" ] && update_page_link "register" "$REGISTER_REDIRECT_URL" "Register"
         [ -n "$NEW_CONTACT_URL" ] && update_page_link "contact-us" "$NEW_CONTACT_URL" "Contact"
         
         [ -n "$FIX_SHORTCUT_URL" ] && update_shortcuts_bar "$FIX_SHORTCUT_URL" "$OLD_URL_TARGET"
         
-        # แก้ไข: บังคับว่าต้องมีทั้ง URL เก่าและใหม่ถึงจะรัน Global Replace เพื่อป้องกัน DB พัง
         [ -n "$OLD_URL_TARGET" ] && [ -n "$NEW_URL_VALUE" ] && update_option_url "$OLD_URL_TARGET" "$NEW_URL_VALUE"
         
         # --- ล้าง Cache ---
