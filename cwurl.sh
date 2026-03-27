@@ -60,39 +60,47 @@ while read -r config_path; do
         echo "------------------------------------------------" | tee -a "$LOG_FILE"
         echo "[$CURRENT_INDEX/$TOTAL_SITES] Site: $DOMAIN ($DISPLAY_NAME)" | tee -a "$LOG_FILE"
 
-       # --- ฟังก์ชัน: บังคับอัปเดต Blocksy Theme (ขั้นเด็ดขาด) ---
-        echo "    [UPDATE] Forcing Blocksy theme & plugin update..." | tee -a "$LOG_FILE"
+        # --- ฟังก์ชัน: อัปเดต Blocksy Theme แบบรอจนเสร็จ (เคลียร์ปุ่มแจ้งเตือน) ---
+        echo "    [UPDATE] Updating Blocksy theme to the latest version..." | tee -a "$LOG_FILE"
         
-        # 1. บังคับดาวน์โหลดธีมเวอร์ชันล่าสุดมาติดตั้งทับของเดิมทันที (ข้ามระบบเช็ค Cache)
         if wp theme is-installed blocksy --allow-root 2>/dev/null; then
-            UPDATE_RESULT=$(wp theme install blocksy --force --allow-root 2>&1)
+            # ใช้คำสั่ง update (จะทำงานเหมือนการกดปุ่ม Update บนหน้าเว็บและรอจนเสร็จ)
+            UPDATE_RESULT=$(wp theme update blocksy --allow-root 2>&1)
             echo "$UPDATE_RESULT" >> "$LOG_FILE"
             
             if echo "$UPDATE_RESULT" | grep -q "Success"; then
-                echo "    [OK] Blocksy theme force-updated successfully." | tee -a "$LOG_FILE"
+                echo "    [OK] Blocksy theme updated successfully! (The update button is now gone)" | tee -a "$LOG_FILE"
+            elif echo "$UPDATE_RESULT" | grep -q "already at the latest version"; then
+                echo "    [SKIP] Blocksy theme is already up to date." | tee -a "$LOG_FILE"
             else
-                echo "    [WARN] Blocksy theme force-update issue. Check log." | tee -a "$LOG_FILE"
+                echo "    [WARN] Failed to update Blocksy. Please check the log." | tee -a "$LOG_FILE"
             fi
         else
             echo "    [SKIP] Blocksy theme is not installed." | tee -a "$LOG_FILE"
         fi
 
-        # 2. บังคับอัปเดต Plugin: Blocksy Companion ด้วยวิธีการเดียวกัน
+        # 2. อัปเดต Plugin: Blocksy Companion
         if wp plugin is-installed blocksy-companion --allow-root 2>/dev/null; then
-            PLUGIN_UPDATE_RESULT=$(wp plugin install blocksy-companion --force --allow-root 2>&1)
+            PLUGIN_UPDATE_RESULT=$(wp plugin update blocksy-companion --allow-root 2>&1)
             echo "$PLUGIN_UPDATE_RESULT" >> "$LOG_FILE"
+            
             if echo "$PLUGIN_UPDATE_RESULT" | grep -q "Success"; then
-                echo "    [OK] Blocksy Companion force-updated." | tee -a "$LOG_FILE"
+                echo "    [OK] Blocksy Companion updated." | tee -a "$LOG_FILE"
+            elif echo "$PLUGIN_UPDATE_RESULT" | grep -q "already at the latest version"; then
+                echo "    [SKIP] Blocksy Companion is already up to date." | tee -a "$LOG_FILE"
             fi
         fi
         
-        # 3. อัปเดต Blocksy Companion Pro (ตัว Pro ไม่มีใน WP.org เลยต้องใช้คำสั่ง update ปกติล้าง Cache เอาครับ)
+        # 3. อัปเดต Blocksy Companion Pro
         if wp plugin is-installed blocksy-companion-pro --allow-root 2>/dev/null; then
             wp transient delete update_plugins --allow-root >/dev/null 2>&1
             PLUGIN_PRO_UPDATE_RESULT=$(wp plugin update blocksy-companion-pro --allow-root 2>&1)
             echo "$PLUGIN_PRO_UPDATE_RESULT" >> "$LOG_FILE"
+            
             if echo "$PLUGIN_PRO_UPDATE_RESULT" | grep -q "Success"; then
                 echo "    [OK] Blocksy Companion Pro updated." | tee -a "$LOG_FILE"
+            elif echo "$PLUGIN_PRO_UPDATE_RESULT" | grep -q "already at the latest version"; then
+                echo "    [SKIP] Blocksy Companion Pro is already up to date." | tee -a "$LOG_FILE"
             fi
         fi
 
@@ -139,7 +147,7 @@ while read -r config_path; do
             fi
         }
 
-        # เริ่มต้นการทำงานตามเงื่อนไข (ทำหลังจากอัปเดตธีมเสร็จแล้ว)
+        # เริ่มต้นการทำงานตามเงื่อนไข
         [ -n "$LOGIN_REDIRECT_URL" ] && update_page_link "login" "$LOGIN_REDIRECT_URL" "Login"
         [ -n "$REGISTER_REDIRECT_URL" ] && update_page_link "register" "$REGISTER_REDIRECT_URL" "Register"
         [ -n "$NEW_CONTACT_URL" ] && update_page_link "contact-us" "$NEW_CONTACT_URL" "Contact"
