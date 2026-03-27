@@ -60,40 +60,35 @@ while read -r config_path; do
         echo "------------------------------------------------" | tee -a "$LOG_FILE"
         echo "[$CURRENT_INDEX/$TOTAL_SITES] Site: $DOMAIN ($DISPLAY_NAME)" | tee -a "$LOG_FILE"
 
-        # --- ฟังก์ชัน: เช็คและอัปเดต Blocksy Theme และ Companion ---
-        echo "    [UPDATE] Checking Blocksy theme & plugin status..." | tee -a "$LOG_FILE"
+       # --- ฟังก์ชัน: บังคับอัปเดต Blocksy Theme (ขั้นเด็ดขาด) ---
+        echo "    [UPDATE] Forcing Blocksy theme & plugin update..." | tee -a "$LOG_FILE"
         
-        # 1. บังคับล้าง Cache การอัปเดตของ WordPress เพื่อให้เช็คเวอร์ชันใหม่ล่าสุดแบบ Real-time
-        wp transient delete update_themes --allow-root >/dev/null 2>&1
-        wp transient delete update_plugins --allow-root >/dev/null 2>&1
-        
-        # 2. เช็คและอัปเดต Theme
+        # 1. บังคับดาวน์โหลดธีมเวอร์ชันล่าสุดมาติดตั้งทับของเดิมทันที (ข้ามระบบเช็ค Cache)
         if wp theme is-installed blocksy --allow-root 2>/dev/null; then
-            UPDATE_RESULT=$(wp theme update blocksy --allow-root 2>&1)
+            UPDATE_RESULT=$(wp theme install blocksy --force --allow-root 2>&1)
             echo "$UPDATE_RESULT" >> "$LOG_FILE"
             
             if echo "$UPDATE_RESULT" | grep -q "Success"; then
-                echo "    [OK] Blocksy theme updated successfully." | tee -a "$LOG_FILE"
-            elif echo "$UPDATE_RESULT" | grep -q "is already at the latest version"; then
-                echo "    [OK] Blocksy theme is already up to date." | tee -a "$LOG_FILE"
+                echo "    [OK] Blocksy theme force-updated successfully." | tee -a "$LOG_FILE"
             else
-                echo "    [WARN] Blocksy theme update issue. Check log." | tee -a "$LOG_FILE"
+                echo "    [WARN] Blocksy theme force-update issue. Check log." | tee -a "$LOG_FILE"
             fi
         else
             echo "    [SKIP] Blocksy theme is not installed." | tee -a "$LOG_FILE"
         fi
 
-        # 3. เช็คและอัปเดต Plugin: Blocksy Companion (ถ้ามี)
+        # 2. บังคับอัปเดต Plugin: Blocksy Companion ด้วยวิธีการเดียวกัน
         if wp plugin is-installed blocksy-companion --allow-root 2>/dev/null; then
-            PLUGIN_UPDATE_RESULT=$(wp plugin update blocksy-companion --allow-root 2>&1)
+            PLUGIN_UPDATE_RESULT=$(wp plugin install blocksy-companion --force --allow-root 2>&1)
             echo "$PLUGIN_UPDATE_RESULT" >> "$LOG_FILE"
             if echo "$PLUGIN_UPDATE_RESULT" | grep -q "Success"; then
-                echo "    [OK] Blocksy Companion updated." | tee -a "$LOG_FILE"
+                echo "    [OK] Blocksy Companion force-updated." | tee -a "$LOG_FILE"
             fi
         fi
         
-        # 4. เช็คและอัปเดต Plugin: Blocksy Companion Pro (ถ้ามี)
+        # 3. อัปเดต Blocksy Companion Pro (ตัว Pro ไม่มีใน WP.org เลยต้องใช้คำสั่ง update ปกติล้าง Cache เอาครับ)
         if wp plugin is-installed blocksy-companion-pro --allow-root 2>/dev/null; then
+            wp transient delete update_plugins --allow-root >/dev/null 2>&1
             PLUGIN_PRO_UPDATE_RESULT=$(wp plugin update blocksy-companion-pro --allow-root 2>&1)
             echo "$PLUGIN_PRO_UPDATE_RESULT" >> "$LOG_FILE"
             if echo "$PLUGIN_PRO_UPDATE_RESULT" | grep -q "Success"; then
