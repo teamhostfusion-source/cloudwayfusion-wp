@@ -6,14 +6,16 @@ LOG_FILE="$HOME/update_blocksy_final.log"
 > "$LOG_FILE"
 echo "------ เริ่มกระบวนการ Check & Update Blocksy ------" | tee -a "$LOG_FILE"
 
-# ค้นหาทุกเว็บที่มีไฟล์ wp-config.php
-ALL_SITES_LIST=$(find -L "$BASE_DIR" -name "wp-config.php" ! -path "*/.*")
+# ค้นหาไฟล์ wp-config.php โดย 'กรอง' โฟลเดอร์ backup, old, staging, trash ออกไป
+ALL_SITES_LIST=$(find -L "$BASE_DIR" -name "wp-config.php" | grep -vEi "backup|old|archive|trash|staging|/\.")
 TOTAL_SITES=$(echo "$ALL_SITES_LIST" | grep -c "wp-config.php")
 
 if [ "$TOTAL_SITES" -eq 0 ]; then
-    echo "Error: ไม่พบการติดตั้ง WordPress ใน $BASE_DIR" | tee -a "$LOG_FILE"
+    echo "Error: ไม่พบการติดตั้ง WordPress (หรือถูกกรองออกหมด) ใน $BASE_DIR" | tee -a "$LOG_FILE"
     exit 1
 fi
+
+echo "พบ WordPress ที่น่าจะใช้งานจริงทั้งหมด $TOTAL_SITES เว็บ เริ่มทำการวนลูป..." | tee -a "$LOG_FILE"
 
 CURRENT_INDEX=0
 
@@ -30,8 +32,9 @@ while read -r config_path; do
         DOMAIN=$(wp option get home --allow-root 2>/dev/null || echo "Unknown Domain")
         echo "------------------------------------------------" | tee -a "$LOG_FILE"
         echo "[$CURRENT_INDEX/$TOTAL_SITES] ตรวจสอบเว็บ: $DOMAIN" | tee -a "$LOG_FILE"
+        echo "Path: $SITE_PATH" >> "$LOG_FILE" # แอบเก็บ Path ลง Log ด้วยเพื่อความชัวร์
 
-        # 1. เช็คและล้าง Cache อัปเดตของ WordPress ก่อน เพื่อบังคับให้ระบบดึงเวอร์ชันล่าสุดจากเซิร์ฟเวอร์
+        # 1. เช็คและล้าง Cache อัปเดตของ WordPress ก่อน 
         wp transient delete update_themes update_plugins --allow-root >/dev/null 2>&1
         
         # 2. ตรวจสอบและอัปเดต Blocksy Theme
@@ -39,7 +42,7 @@ while read -r config_path; do
             CURRENT_VER=$(wp theme get blocksy --field=version --allow-root 2>/dev/null)
             echo "    [CHECK] พบธีม Blocksy (เวอร์ชันปัจจุบัน: $CURRENT_VER)" | tee -a "$LOG_FILE"
             
-            # ใช้งาน wp theme update ตามมาตรฐาน เพื่อให้ฐานข้อมูล WP เคลียร์ป้ายแจ้งเตือนอย่างถูกต้อง
+            # ใช้งาน wp theme update ตามมาตรฐาน
             UPDATE_MSG=$(wp theme update blocksy --allow-root 2>&1)
             
             if echo "$UPDATE_MSG" | grep -q "Success"; then
@@ -49,14 +52,14 @@ while read -r config_path; do
                 echo "    [OK] Theme เป็นเวอร์ชันล่าสุดอยู่แล้ว (Up-to-date!)" | tee -a "$LOG_FILE"
             else
                 echo "    [WARN] พบปัญหา: $UPDATE_MSG" | tee -a "$LOG_FILE"
-                # แผนสำรองกรณี API ของ WordPress ค้าง: บังคับติดตั้งผ่าน WP-CLI 
+                echo "    [RETRY] บังคับติดตั้งทับ (Force Install)..." | tee -a "$LOG_FILE"
                 wp theme install blocksy --force --allow-root >/dev/null 2>&1
             fi
         else
             echo "    [SKIP] ไม่พบธีม Blocksy" | tee -a "$LOG_FILE"
         fi
 
-        # 3. ตรวจสอบและอัปเดตปลั๊กอิน Blocksy Companion (ตัวสำคัญที่ควบคุมหน้า Dashboard)
+        # 3. ตรวจสอบและอัปเดตปลั๊กอิน Blocksy Companion
         if wp plugin is-installed blocksy-companion --allow-root 2>/dev/null; then
             echo "    [CHECK] กำลังอัปเดต Blocksy Companion..." | tee -a "$LOG_FILE"
             wp plugin update blocksy-companion --allow-root >/dev/null 2>&1
