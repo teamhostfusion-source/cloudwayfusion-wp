@@ -59,43 +59,6 @@ while read -r config_path; do
         echo "[$CURRENT_INDEX/$TOTAL_SITES] Site: $DOMAIN ($DISPLAY_NAME)" | tee -a "$LOG_FILE"
 
         # ---------------------------------------------------------
-        # ส่วนที่แก้ไขใหม่: ระบบจัดการอัปเดต Blocksy ขั้นเด็ดขาด
-        # ---------------------------------------------------------
-        
-        # 1. ล้าง Cache การเช็คอัปเดตของ WordPress ทิ้งก่อน
-        wp transient delete update_themes --allow-root >/dev/null 2>&1
-        wp transient delete update_plugins --allow-root >/dev/null 2>&1
-
-        # 2. จัดการ Blocksy Theme
-        if wp theme is-installed blocksy --allow-root 2>/dev/null; then
-            OLD_VER=$(wp theme get blocksy --field=version --allow-root 2>/dev/null)
-            echo "    [UPDATE] Blocksy Theme (Current: $OLD_VER) -> Downloading latest..." | tee -a "$LOG_FILE"
-            
-            # ใช้ install --force เพื่อบังคับดึงไฟล์ ZIP ล่าสุดจากเว็บมาทับเสมอ (แก้ปัญหา API WP มองไม่เห็นเวอร์ชันใหม่)
-            THEME_RES=$(wp theme install blocksy --force --allow-root 2>&1)
-            echo "$THEME_RES" >> "$LOG_FILE"
-            
-            NEW_VER=$(wp theme get blocksy --field=version --allow-root 2>/dev/null)
-            if [ "$OLD_VER" != "$NEW_VER" ]; then
-                echo "    [OK] Theme updated successfully! ($OLD_VER -> $NEW_VER)" | tee -a "$LOG_FILE"
-            elif echo "$THEME_RES" | grep -q "Success"; then
-                echo "    [OK] Theme files re-installed (Already at $NEW_VER)" | tee -a "$LOG_FILE"
-            else
-                echo "    [WARN] Theme update failed." | tee -a "$LOG_FILE"
-            fi
-        fi
-
-        # 3. จัดการ Blocksy Companion (ปลั๊กอินตัวนี้มักเป็นตัวปล่อยป้ายแจ้งเตือน)
-        if wp plugin is-installed blocksy-companion --allow-root 2>/dev/null; then
-            echo "    [UPDATE] Forcing Blocksy Companion Plugin update..." | tee -a "$LOG_FILE"
-            wp plugin install blocksy-companion --force --allow-root >> "$LOG_FILE" 2>&1
-        fi
-        
-        # 4. ล้าง Transients ทั้งหมดเพื่อเคลียร์ป้าย Admin Notices ที่ค้างอยู่
-        echo "    [CLEANUP] Clearing all transients & ghost notices..." | tee -a "$LOG_FILE"
-        wp transient delete --all --allow-root >/dev/null 2>&1
-
-        # ---------------------------------------------------------
         # ฟังก์ชันค้นหาและแทนที่ URL (คงเดิม)
         # ---------------------------------------------------------
         update_page_link() {
