@@ -35,7 +35,7 @@ BASE_DIR="$HOME/applications"
 LOG_FILE="$HOME/update_wp.log"
 
 > "$LOG_FILE"
-echo "------ Update started at $(date) ------" >> "$LOG_FILE"
+echo "------ 1Update started at $(date) ------" >> "$LOG_FILE"
 
 ALL_SITES_LIST=$(find -L "$BASE_DIR" -name "wp-config.php" ! -path "*/.*")
 TOTAL_SITES=$(echo "$ALL_SITES_LIST" | grep -c "wp-config.php")
