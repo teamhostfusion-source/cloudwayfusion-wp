@@ -4,7 +4,7 @@ BASE_DIR="$HOME/applications"
 LOG_FILE="$HOME/update_blocksy_final.log"
 
 > "$LOG_FILE"
-echo "------ เริ่มกระบวนการ Check & Update Blocksy ------" | tee -a "$LOG_FILE"
+echo "------ Check & Update Blocksy ------" | tee -a "$LOG_FILE"
 
 # ค้นหาไฟล์ wp-config.php โดย 'กรอง' โฟลเดอร์ backup, old, staging, trash ออกไป
 ALL_SITES_LIST=$(find -L "$BASE_DIR" -name "wp-config.php" | grep -vEi "backup|old|archive|trash|staging|/\.")
