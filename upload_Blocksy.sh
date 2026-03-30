@@ -58,7 +58,7 @@ for APP_FOLDER in */; do
 
             # 2. ตรวจสอบไฟล์ ZIP
             if [[ ! -s "$LOCAL_ZIP" ]] || ! unzip -t "$LOCAL_ZIP" >/dev/null 2>&1; then
-                printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "❌ DL Failed" | tee -a "$LOG_FILE"
+                printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "❌ DownL Failed" | tee -a "$LOG_FILE"
                 FAILED_LIST+="- $APP_NAME: Download failed or invalid ZIP\n"
                 rm -f "$LOCAL_ZIP"
                 continue
