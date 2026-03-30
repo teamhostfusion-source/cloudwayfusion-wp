@@ -1,24 +1,30 @@
 #!/bin/bash
 
-# --- ตั้งค่าส่วนตัว ---
-BASE_DIR="$HOME/applications"
-LOG_FILE="$HOME/update_github_assets.log"
-# ระบุ URL ของ GitHub (ตัวอย่าง: https://github.com/USER/REPO/archive/refs/heads/main.zip)
-PLUGIN_GITHUB_URL="https://github.com/creativethemes/blocksy-companion/archive/refs/heads/master.zip"
-THEME_GITHUB_URL="https://github.com/creativethemes/blocksy/archive/refs/heads/master.zip"
+# --- 1. ตั้งค่า Path ของไฟล์ .zip ในเครื่อง ---
+PLUGIN_ZIP_PATH="/home/username/my-files/blocksy-companion-pro.zip"
+PLUGIN_SLUG="blocksy-companion-pro"
 
-# ชื่อโฟลเดอร์ปลายทางที่ถูกต้อง (Slug)
-PLUGIN_SLUG="blocksy-companion"
-THEME_SLUG="blocksy"
+# --- 2. ตั้งค่าระบบ ---
+BASE_DIR="$HOME/applications"
+LOG_FILE="$HOME/update_blocksy_pro.log"
 
 > "$LOG_FILE"
-echo "------ เริ่มกระบวนการอัปเดตจาก GitHub สำหรับทุกเว็บไซต์ ------" | tee -a "$LOG_FILE"
+echo "------ เริ่มกระบวนการอัปเดต (ติดตั้งทับ) ปลั๊กอิน $PLUGIN_SLUG [$(date)] ------" | tee -a "$LOG_FILE"
 
-# กรองโฟลเดอร์เอาเฉพาะที่มี wp-config.php
+# ตรวจสอบไฟล์ Zip
+if [ ! -f "$PLUGIN_ZIP_PATH" ]; then
+    echo "Error: ไม่พบไฟล์ .zip ที่ $PLUGIN_ZIP_PATH" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# กรองหาเว็บ
 ALL_SITES_LIST=$(find -L "$BASE_DIR" -maxdepth 3 -name "wp-config.php" | grep -vEi "backup|old|archive|trash|staging|/\.")
 TOTAL_SITES=$(echo "$ALL_SITES_LIST" | grep -c "wp-config.php")
 
-[ "$TOTAL_SITES" -eq 0 ] && echo "Error: ไม่พบเว็บไซต์" && exit 1
+if [ "$TOTAL_SITES" -eq 0 ]; then
+    echo "Error: ไม่พบการติดตั้ง WordPress"
+    exit 1
+fi
 
 CURRENT_INDEX=0
 
@@ -28,48 +34,39 @@ while read -r config_path; do
     
     (
         cd "$SITE_PATH" || exit 1
-        DOMAIN=$(wp option get home --allow-root 2>/dev/null || echo "Unknown")
-        echo "------------------------------------------------" | tee -a "$LOG_FILE"
-        echo "[$CURRENT_INDEX/$TOTAL_SITES] กำลังจัดการ: $DOMAIN" | tee -a "$LOG_FILE"
-
-        # 1. อัปเดต Theme จาก GitHub
-        if wp theme is-installed "$THEME_SLUG" --allow-root 2>/dev/null; then
-            echo "    [ACTION] อัปเดต Theme: $THEME_SLUG จาก GitHub..." | tee -a "$LOG_FILE"
-            wp theme install "$THEME_GITHUB_URL" --force --activate --allow-root >/dev/null 2>&1
-            
-            # แก้ไขปัญหา GitHub Folder Name (เช่น blocksy-master -> blocksy)
-            THEME_DIR="./wp-content/themes"
-            GITHUB_FOLDER=$(ls $THEME_DIR | grep "$THEME_SLUG-")
-            if [ ! -z "$GITHUB_FOLDER" ]; then
-                mv "$THEME_DIR/$GITHUB_FOLDER" "$THEME_DIR/$THEME_SLUG"
-            fi
-        fi
-
-        # 2. อัปเดต Plugin จาก GitHub
-        if wp plugin is-installed "$PLUGIN_SLUG" --allow-root 2>/dev/null; then
-            echo "    [ACTION] อัปเดต Plugin: $PLUGIN_SLUG จาก GitHub..." | tee -a "$LOG_FILE"
-            wp plugin install "$PLUGIN_GITHUB_URL" --force --activate --allow-root >/dev/null 2>&1
-            
-            # แก้ไขชื่อโฟลเดอร์ Plugin (ถ้ามีขีดต่อท้ายจาก GitHub)
-            PLUGIN_DIR="./wp-content/plugins"
-            GITHUB_PLG_FOLDER=$(ls $PLUGIN_DIR | grep "$PLUGIN_SLUG-")
-            if [ ! -z "$GITHUB_PLG_FOLDER" ]; then
-                mv "$PLUGIN_DIR/$GITHUB_PLG_FOLDER" "$PLUGIN_DIR/$PLUGIN_SLUG"
-            fi
-        fi
-
-        # 3. Cleanup & Cache (ตาม Code เดิมของคุณ)
-        echo "    [CLEANUP] เคลียร์ Database notices & Cache..." | tee -a "$LOG_FILE"
-        wp transient delete --all --allow-root >/dev/null 2>&1
-        wp cache flush --allow-root >/dev/null 2>&1
+        DOMAIN=$(wp option get home --allow-root 2>/dev/null || echo "Unknown Domain")
         
-        # Purge Litespeed / WP Rocket
-        wp plugin is-active litespeed-cache --allow-root 2>/dev/null && wp litespeed-purge all --allow-root >/dev/null 2>&1
-        wp plugin is-active wp-rocket --allow-root 2>/dev/null && wp rocket clean --allow-root >/dev/null 2>&1
+        echo "------------------------------------------------" | tee -a "$LOG_FILE"
+        echo "[$CURRENT_INDEX/$TOTAL_SITES] เว็บ: $DOMAIN" | tee -a "$LOG_FILE"
 
-        echo "    [OK] เสร็จสิ้น!" | tee -a "$LOG_FILE"
+        # เช็คว่ามีปลั๊กอินอยู่แล้ว (ตามเงื่อนไขของคุณ)
+        if wp plugin is-installed "$PLUGIN_SLUG" --allow-root 2>/dev/null; then
+            echo "    [ACTION] พบปลั๊กอินเดิม กำลังแตกไฟล์ Zip ติดตั้งทับ..." | tee -a "$LOG_FILE"
+            
+            # คำสั่งติดตั้งทับ (--force คือตัวจัดการให้ลงทับไฟล์เดิม)
+            wp plugin install "$PLUGIN_ZIP_PATH" --force --activate --allow-root >/dev/null 2>&1
+            
+            # ป้องกันปัญหาเรื่องสิทธิ์ไฟล์ (เปลี่ยนกลับเป็น www-data)
+            chown -R www-data:www-data "$SITE_PATH/wp-content/plugins/$PLUGIN_SLUG"
+            
+            echo "    [CLEANUP] เคลียร์ Cache และฐานข้อมูล..." | tee -a "$LOG_FILE"
+            
+            # ลบ Option แจ้งเตือนของ Blocksy
+            wp option list --search="*blocksy*" --field=option_name --allow-root 2>/dev/null | grep -i "notice\|update\|version" | xargs -I {} wp option delete {} --allow-root >/dev/null 2>&1
+            wp transient delete --all --allow-root >/dev/null 2>&1
+            wp cache flush --allow-root >/dev/null 2>&1
+            
+            # รองรับ Cache Plugins
+            wp plugin is-active litespeed-cache --allow-root 2>/dev/null && wp litespeed-purge all --allow-root >/dev/null 2>&1
+            wp plugin is-active wp-rocket --allow-root 2>/dev/null && wp rocket clean --allow-root >/dev/null 2>&1
+
+            echo "    [OK] ติดตั้งทับเรียบร้อย!" | tee -a "$LOG_FILE"
+        else
+            echo "    [SKIP] ไม่พบปลั๊กอิน $PLUGIN_SLUG ข้ามการทำงาน" | tee -a "$LOG_FILE"
+        fi
+
     )
 done <<< "$ALL_SITES_LIST"
 
 echo "------------------------------------------------" | tee -a "$LOG_FILE"
-echo "Done! ตรวจสอบ Log: $LOG_FILE"
+echo "ทำงานเสร็จสิ้น! เช็คผลลัพธ์ได้ที่: $LOG_FILE"
