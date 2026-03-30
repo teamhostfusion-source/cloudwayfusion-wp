@@ -4,7 +4,7 @@ USER_HOME="$HOME"
 PLUGIN_SLUG="blocksy-companion-pro"
 
 # --- 1) ตั้งค่าชื่อไฟล์ที่อัปโหลดไว้แล้ว ---
-SEARCH_FILENAME="blocksy-companion-pro.2.1.37.zip" 
+SEARCH_FILENAME="blocksy-companion-pro.zip" 
 LOG_FILE="$USER_HOME/install_blocksy_$(date +%Y%m%d_%H%M%S).txt"
 
 > "$LOG_FILE"
@@ -15,7 +15,7 @@ echo "🔍 Step 1: Searching and Verifying the ZIP file..." | tee -a "$LOG_FILE"
 ZIP_FILE=$(find "$USER_HOME" -maxdepth 3 -type f -name "$SEARCH_FILENAME" 2>/dev/null | head -n 1)
 
 if [ -z "$ZIP_FILE" ]; then
-    echo "❌ Error: ไม่พบไฟล์ $SEARCH_FILENAME ในระบบ" | tee -a "$LOG_FILE"
+    echo "❌ Error: ไม่พบ-ไฟล์ $SEARCH_FILENAME ในระบบ" | tee -a "$LOG_FILE"
     echo "👉 กรุณาตรวจสอบว่าอัปโหลดไฟล์มาแล้ว และชื่อไฟล์ตรงกับตัวพิมพ์เล็ก-ใหญ่ทุกตัวอักษร" | tee -a "$LOG_FILE"
     exit 1
 fi
