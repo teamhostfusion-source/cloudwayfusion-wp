@@ -4,7 +4,7 @@ USER_HOME="$HOME"
 PLUGIN_SLUG="blocksy-companion-pro"
 
 # --- 1) ตั้งค่า GitHub (ใส่ Token และ URL ให้ถูกต้อง) ---
-GITHUB_URL="https://github.com/teamhostfusion-source/cloudwayfusion-wp/blob/main/blocksy-companion-pro.zip"
+GITHUB_URL="https://github.com/teamhostfusion-source/cloudwayfusion-wp/raw/main/blocksy-companion-pro.zip"
 TEMP_ZIP_NAME="${PLUGIN_SLUG}_temp.zip"
 LOG_FILE="$USER_HOME/install_blocksy_$(date +%Y%m%d_%H%M%S).txt"
 
