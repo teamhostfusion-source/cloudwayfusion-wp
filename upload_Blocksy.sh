@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- 1. ตั้งค่า Path ของไฟล์ .zip ในเครื่อง ---
-PLUGIN_ZIP_PATH="/home/username/my-files/blocksy-companion-pro.zip"
+PLUGIN_ZIP_PATH="C:\Users\Bzz-PC\Downloads\blocksy-companion-pro.2.1.37.zip"
 PLUGIN_SLUG="blocksy-companion-pro"
 
 # --- 2. ตั้งค่าระบบ ---
