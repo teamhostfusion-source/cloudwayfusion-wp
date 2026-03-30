@@ -1,78 +1,121 @@
-#!/bin/bash
+#!/bin/bash                                         
 
-# --- 1. ตั้งค่า GitHub URL ---
-# นำ Link .zip จาก GitHub มาใส่ตรงนี้ (ถ้าเป็น Private Repo อย่าลืมใส่ Token ตามที่คุยกันไว้นะครับ)
-PLUGIN_GITHUB_URL="https://github.com/teamhostfusion-source/cloudwayfusion-wp/blob/main/blocksy-companion-pro.2.1.37.zip"
+USER_HOME="$HOME"
+# --- 1) ตั้งค่าไฟล์และระบบ ---
+BASE_DIR="$USER_HOME/applications"
+ZIP_FILE="$USER_HOME/blocksy-companion-pro.zip" # ชื่อไฟล์ ZIP ของคุณ
 PLUGIN_SLUG="blocksy-companion-pro"
+LOG_FILE="$USER_HOME/update_blocksy_$(date +%Y%m%d_%H%M%S).txt"
 
-# --- 2. ตั้งค่าระบบ ---
-BASE_DIR="$HOME/applications"
-LOG_FILE="$HOME/update_blocksy_pro_github.log"
-
-> "$LOG_FILE"
-echo "------ เริ่มกระบวนการอัปเดต $PLUGIN_SLUG จาก GitHub [$(date)] ------" | tee -a "$LOG_FILE"
-
-# กรองหาเว็บ
-ALL_SITES_LIST=$(find -L "$BASE_DIR" -maxdepth 3 -name "wp-config.php" | grep -vEi "backup|old|archive|trash|staging|/\.")
-TOTAL_SITES=$(echo "$ALL_SITES_LIST" | grep -c "wp-config.php")
-
-if [ "$TOTAL_SITES" -eq 0 ]; then
-    echo "Error: ไม่พบการติดตั้ง WordPress"
+# ตรวจสอบว่าไฟล์ ZIP มีอยู่จริงไหมก่อนเริ่ม
+if [ ! -f "$ZIP_FILE" ]; then
+    echo "❌ Error: ZIP file not found at $ZIP_FILE"
     exit 1
 fi
 
-CURRENT_INDEX=0
+# กำหนด Path หลักของ Applications
+if [ -L "$BASE_DIR" ]; then
+    APPS_DIR=$(readlink -f "$BASE_DIR")
+else
+    APPS_DIR="$BASE_DIR"
+fi
 
-while read -r config_path; do
-    ((CURRENT_INDEX++))
-    SITE_PATH=$(dirname "$config_path")
-    
-    (
-        cd "$SITE_PATH" || exit 1
-        DOMAIN=$(wp option get home --allow-root 2>/dev/null || echo "Unknown Domain")
+cd "$APPS_DIR" || exit 1
+
+# --- 2) การนับยอดก่อนเริ่ม (Pre-Scan Count) ---
+PRE_COUNT=$(find . -maxdepth 1 -type d ! -name "." ! -name "applications" | wc -l)
+
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+echo "🚀 Blocksy Pro Mass Update started at $(date)" | tee -a "$LOG_FILE"
+echo "Total folders to check: $PRE_COUNT" | tee -a "$LOG_FILE"
+echo "ZIP File: $ZIP_FILE" | tee -a "$LOG_FILE"
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+# ปรับความกว้างของตารางให้พอดีกับข้อความ Status
+printf "%-22s | %-28s | %-12s\n" "Folder Name" "Domain" "Status" | tee -a "$LOG_FILE"
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+
+# --- 3) เริ่มการ Scan และ Update ---
+WP_SITES_FOUND=0
+UPDATE_SUCCESS=0
+SKIPPED_COUNT=0
+SCANNED_COUNT=0
+FAILED_LIST=""
+
+for APP_FOLDER in */; do
+    APP_NAME="${APP_FOLDER%/}"
+
+    # ข้ามโฟลเดอร์ที่ไม่เกี่ยวข้อง
+    if [ "$APP_NAME" == "applications" ] || [ "$APP_NAME" == "." ] || [ "$APP_NAME" == ".." ]; then
+        continue
+    fi
+
+    ((SCANNED_COUNT++))
+    SITE_PATH="$APPS_DIR/$APP_FOLDER/public_html"
+
+    if [ -d "$SITE_PATH" ]; then
+        cd "$SITE_PATH" || continue
         
-        echo "------------------------------------------------" | tee -a "$LOG_FILE"
-        echo "[$CURRENT_INDEX/$TOTAL_SITES] เว็บ: $DOMAIN" | tee -a "$LOG_FILE"
+        # ตรวจสอบว่าเป็น WP และดึง Domain (ตัด https:// ออกเพื่อให้ตารางสวยงาม)
+        DOMAIN=$(wp option get home --skip-plugins --skip-themes --allow-root 2>/dev/null | sed 's|^https*://||')
 
-        # เช็คว่ามีปลั๊กอินอยู่แล้วถึงจะทำการอัปเดตทับ
-        if wp plugin is-installed "$PLUGIN_SLUG" --allow-root 2>/dev/null; then
-            echo "    [ACTION] พบปลั๊กอินเดิม กำลังดาวน์โหลดและติดตั้งทับจาก GitHub..." | tee -a "$LOG_FILE"
+        if [ -n "$DOMAIN" ]; then
+            ((WP_SITES_FOUND++))
             
-            # ลบของเก่าออกก่อน (ชัวร์กว่า --force กรณีชื่อโฟลเดอร์จาก GitHub ไม่ตรงกัน)
-            wp plugin delete "$PLUGIN_SLUG" --allow-root >/dev/null 2>&1
-            
-            # ติดตั้งไฟล์ใหม่จาก GitHub
-            wp plugin install "$PLUGIN_GITHUB_URL" --activate --allow-root >/dev/null 2>&1
-            
-            # แก้ไขปัญหาชื่อโฟลเดอร์ GitHub ที่มีขีดต่อท้าย (เช่น -main, -master)
-            GITHUB_FOLDER=$(ls wp-content/plugins | grep "^$PLUGIN_SLUG-")
-            if [ ! -z "$GITHUB_FOLDER" ]; then
-                mv "wp-content/plugins/$GITHUB_FOLDER" "wp-content/plugins/$PLUGIN_SLUG"
-                # สั่ง Activate อีกรอบเผื่อโฟลเดอร์เปลี่ยนชื่อแล้ว WordPress หลง
-                wp plugin activate "$PLUGIN_SLUG" --allow-root >/dev/null 2>&1
+            # เช็คว่าเว็บนี้มีปลั๊กอิน Blocksy อยู่แล้วหรือไม่
+            if wp plugin is-installed "$PLUGIN_SLUG" --allow-root 2>/dev/null; then
+                
+                # สั่งติดตั้งทับ
+                if wp plugin install "$ZIP_FILE" --activate --force --allow-root >> "$LOG_FILE" 2>&1; then
+                    
+                    # คืนสิทธิ์ให้ Web Server
+                    chown -R www-data:www-data "$SITE_PATH/wp-content/plugins/$PLUGIN_SLUG" 2>/dev/null
+                    
+                    # --- CLEANUP (ลบแจ้งเตือน & ล้างแคช) ---
+                    wp option list --search="*blocksy*" --field=option_name --allow-root 2>/dev/null | grep -i "notice\|update\|version" | xargs -I {} wp option delete {} --allow-root >> "$LOG_FILE" 2>&1
+                    wp transient delete --all --allow-root >> "$LOG_FILE" 2>&1
+                    wp cache flush --allow-root >> "$LOG_FILE" 2>&1
+                    
+                    wp plugin is-active litespeed-cache --allow-root 2>/dev/null && wp litespeed-purge all --allow-root >> "$LOG_FILE" 2>&1
+                    wp plugin is-active wp-rocket --allow-root 2>/dev/null && wp rocket clean --allow-root >> "$LOG_FILE" 2>&1
+                    # -------------------------------------
+
+                    printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "✅ Updated" | tee -a "$LOG_FILE"
+                    ((UPDATE_SUCCESS++))
+                else
+                    printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "❌ Failed" | tee -a "$LOG_FILE"
+                    FAILED_LIST+="- $APP_NAME (Update failed)\n"
+                fi
+            else
+                # กรณีเว็บนี้ไม่ได้ลงปลั๊กอิน Blocksy ไว้
+                printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "⏭️ Skip (No plugin)" | tee -a "$LOG_FILE"
+                ((SKIPPED_COUNT++))
             fi
-
-            # ป้องกันปัญหาเรื่องสิทธิ์ไฟล์
-            chown -R www-data:www-data "$SITE_PATH/wp-content/plugins/$PLUGIN_SLUG"
-            
-            echo "    [CLEANUP] เคลียร์ Cache และฐานข้อมูล..." | tee -a "$LOG_FILE"
-            
-            # ลบ Option แจ้งเตือนของ Blocksy
-            wp option list --search="*blocksy*" --field=option_name --allow-root 2>/dev/null | grep -i "notice\|update\|version" | xargs -I {} wp option delete {} --allow-root >/dev/null 2>&1
-            wp transient delete --all --allow-root >/dev/null 2>&1
-            wp cache flush --allow-root >/dev/null 2>&1
-            
-            # รองรับ Cache Plugins
-            wp plugin is-active litespeed-cache --allow-root 2>/dev/null && wp litespeed-purge all --allow-root >/dev/null 2>&1
-            wp plugin is-active wp-rocket --allow-root 2>/dev/null && wp rocket clean --allow-root >/dev/null 2>&1
-
-            echo "    [OK] อัปเดตจาก GitHub เรียบร้อย!" | tee -a "$LOG_FILE"
         else
-            echo "    [SKIP] ไม่พบปลั๊กอิน $PLUGIN_SLUG ข้ามการทำงาน" | tee -a "$LOG_FILE"
+            printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "(Not a WP Site)" "⚠️ Skip" | tee -a "$LOG_FILE"
+            FAILED_LIST+="- $APP_NAME (Found public_html but DB error/Not WP)\n"
         fi
+        
+        cd "$APPS_DIR"
+    else
+        printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "(No public_html)" "⚠️ Skip" | tee -a "$LOG_FILE"
+        FAILED_LIST+="- $APP_NAME (Missing public_html folder)\n"
+    fi
+done
 
-    )
-done <<< "$ALL_SITES_LIST"
+# --- 4) การนับยอดหลังทำงานเสร็จ (Post-Scan Summary) ---
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+echo "✅ Update Process Completed!" | tee -a "$LOG_FILE"
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+echo "Total folders found         : $PRE_COUNT" | tee -a "$LOG_FILE"
+echo "Total folders processed     : $SCANNED_COUNT" | tee -a "$LOG_FILE"
+echo "WordPress sites detected    : $WP_SITES_FOUND" | tee -a "$LOG_FILE"
+echo "Skipped (Plugin not found)  : $SKIPPED_COUNT" | tee -a "$LOG_FILE"
+echo "Successfully updated        : $UPDATE_SUCCESS" | tee -a "$LOG_FILE"
 
-echo "------------------------------------------------" | tee -a "$LOG_FILE"
-echo "ทำงานเสร็จสิ้น! เช็คผลลัพธ์ได้ที่: $LOG_FILE"
+if [ -n "$FAILED_LIST" ]; then
+    echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+    echo "⚠️  Details of folders with issues:" | tee -a "$LOG_FILE"
+    echo -e "$FAILED_LIST" | tee -a "$LOG_FILE"
+fi
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+echo "Log saved to: $LOG_FILE"
