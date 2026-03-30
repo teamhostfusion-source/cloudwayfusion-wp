@@ -54,9 +54,7 @@ for APP_FOLDER in */; do
         if [ -n "$DOMAIN" ]; then
             ((WP_SITES_FOUND++))
             
-            # ตรวจสอบว่ามี Plugin นี้ติดตั้งอยู่แล้วหรือไม่
-            if wp plugin is-installed "$PLUGIN_SLUG" --allow-root 2>/dev/null; then
-                
+                           
                 # --- [จุดที่เปลี่ยน] Download ไฟล์ลงในโฟลเดอร์ของเว็บนี้โดยเฉพาะ ---
                 LOCAL_DOWNLOAD_DEST="$SITE_PATH/$SEARCH_FILENAME"
                 wget -q -O "$LOCAL_DOWNLOAD_DEST" "$GITHUB_URL"
@@ -93,10 +91,7 @@ for APP_FOLDER in */; do
 
                     printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "✅ Installed" | tee -a "$LOG_FILE"
                     ((UPDATE_SUCCESS++))
-                else
-                    printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "❌ Install Fail" | tee -a "$LOG_FILE"
-                    ERROR_MSG=$(echo "$INSTALL_OUTPUT" | grep "Error" | head -n 1)
-                    FAILED_LIST+="- $APP_NAME: $ERROR_MSG\n"
+                
                 fi
 
                 # ลบไฟล์ Zip ทิ้งหลังจากติดตั้งเสร็จ (เพื่อความสะอาด)
