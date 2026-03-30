@@ -1,16 +1,29 @@
 #!/bin/bash                                         
 
 USER_HOME="$HOME"
-# --- 1) ตั้งค่าระบบและ URL ของไฟล์ ---
-# ใส่ Link สำหรับดาวน์โหลดไฟล์ .zip (เช่น ลิงก์ตรงจาก Server อื่น หรือ GitHub)
-DOWNLOAD_URL="https://github.com/teamhostfusion-source/cloudwayfusion-wp/blob/main/blocksy-companion-pro.2.1.37.zip"
-
-BASE_DIR="$USER_HOME/applications"
-ZIP_FILE="$USER_HOME/blocksy-companion-pro_temp.zip" # ไฟล์จะถูกโหลดมาเก็บไว้ชื่อนี้
 PLUGIN_SLUG="blocksy-companion-pro"
+# กำหนดชื่อไฟล์ที่ต้องการให้สคริปต์ค้นหา
+SEARCH_FILENAME="blocksy-companion-pro.zip"
 LOG_FILE="$USER_HOME/install_blocksy_$(date +%Y%m%d_%H%M%S).txt"
 
-# กำหนด Path หลักของ Applications
+> "$LOG_FILE"
+echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
+echo "🔍 Step 1: Searching for ZIP file..." | tee -a "$LOG_FILE"
+
+# ค้นหาไฟล์ .zip ภายใน Home Directory และดึงมาแค่ไฟล์แรกที่เจอ
+ZIP_FILE=$(find "$USER_HOME" -type f -name "$SEARCH_FILENAME" 2>/dev/null | head -n 1)
+
+# เช็คว่าค้นหาไฟล์เจอหรือไม่
+if [ -z "$ZIP_FILE" ]; then
+    echo "❌ Error: ไม่พบไฟล์ $SEARCH_FILENAME ในระบบเลยครับ" | tee -a "$LOG_FILE"
+    echo "กรุณาตรวจสอบว่าอัปโหลดไฟล์มาแล้ว และชื่อไฟล์ตรงกับตัวพิมพ์เล็ก-ใหญ่" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+echo "✅ Found ZIP file at: $ZIP_FILE" | tee -a "$LOG_FILE"
+
+# --- 2) ตั้งค่า Path หลักของ Applications ---
+BASE_DIR="$USER_HOME/applications"
 if [ -L "$BASE_DIR" ]; then
     APPS_DIR=$(readlink -f "$BASE_DIR")
 else
@@ -19,21 +32,7 @@ fi
 
 cd "$APPS_DIR" || exit 1
 
-echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
-echo "⬇️  Step 1: Downloading plugin file..." | tee -a "$LOG_FILE"
-echo "URL: $DOWNLOAD_URL" | tee -a "$LOG_FILE"
-
-# โหลดไฟล์ลงมาที่ Server (-q คือซ่อนรายละเอียดการโหลด, -O คือตั้งชื่อไฟล์ปลายทาง)
-wget -q -O "$ZIP_FILE" "$DOWNLOAD_URL"
-
-# ตรวจสอบว่าโหลดสำเร็จและไฟล์มีขนาดมากกว่า 0 byte หรือไม่
-if [ ! -s "$ZIP_FILE" ]; then
-    echo "❌ Error: Failed to download the file or file is empty." | tee -a "$LOG_FILE"
-    exit 1
-fi
-echo "✅ Download successful! File saved temporarily." | tee -a "$LOG_FILE"
-
-# --- 2) การนับยอดก่อนเริ่ม (Pre-Scan Count) ---
+# --- 3) การนับยอดก่อนเริ่ม (Pre-Scan Count) ---
 PRE_COUNT=$(find . -maxdepth 1 -type d ! -name "." ! -name "applications" | wc -l)
 
 echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
@@ -43,7 +42,7 @@ echo "-----------------------------------------------------------------" | tee -
 printf "%-22s | %-28s | %-12s\n" "Folder Name" "Domain" "Status" | tee -a "$LOG_FILE"
 echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
 
-# --- 3) เริ่มการ Scan และ Install ---
+# --- 4) เริ่มการ Scan และ Install ---
 WP_SITES_FOUND=0
 UPDATE_SUCCESS=0
 SKIPPED_COUNT=0
@@ -69,12 +68,13 @@ for APP_FOLDER in */; do
         if [ -n "$DOMAIN" ]; then
             ((WP_SITES_FOUND++))
             
-            # เช็คว่ามีปลั๊กอินอยู่แล้ว จึงทำการติดตั้งทับ
+            # เช็คว่ามีปลั๊กอิน Blocksy อยู่แล้วหรือไม่
             if wp plugin is-installed "$PLUGIN_SLUG" --allow-root 2>/dev/null; then
                 
-                # สั่งติดตั้งจากไฟล์ ZIP ที่โหลดมา (ใช้ --force เพื่อทับไฟล์เดิม)
+                # สั่งติดตั้งจากไฟล์ ZIP ที่ค้นหาเจอ (ใช้ --force เพื่อทับไฟล์เดิม)
                 if wp plugin install "$ZIP_FILE" --activate --force --allow-root >> "$LOG_FILE" 2>&1; then
                     
+                    # จัดการสิทธิ์ไฟล์
                     chown -R www-data:www-data "$SITE_PATH/wp-content/plugins/$PLUGIN_SLUG" 2>/dev/null
                     
                     # --- CLEANUP ---
@@ -108,13 +108,9 @@ for APP_FOLDER in */; do
     fi
 done
 
-# ลบไฟล์ ZIP ทิ้งหลังจากติดตั้งเสร็จทุกเว็บแล้ว เพื่อไม่ให้รก Server
-rm -f "$ZIP_FILE"
-
-# --- 4) การนับยอดหลังทำงานเสร็จ (Post-Scan Summary) ---
+# --- 5) การนับยอดหลังทำงานเสร็จ (Post-Scan Summary) ---
 echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
 echo "✅ Installation Process Completed!" | tee -a "$LOG_FILE"
-echo "🗑️ Temporary ZIP file removed." | tee -a "$LOG_FILE"
 echo "-----------------------------------------------------------------" | tee -a "$LOG_FILE"
 echo "Total folders found         : $PRE_COUNT" | tee -a "$LOG_FILE"
 echo "WordPress sites detected    : $WP_SITES_FOUND" | tee -a "$LOG_FILE"
