@@ -92,8 +92,6 @@ for APP_FOLDER in */; do
                     printf "%-22s | %-28s | %-12s\n" "$APP_NAME" "$DOMAIN" "✅ Installed" | tee -a "$LOG_FILE"
                     ((UPDATE_SUCCESS++))
                 
-                fi
-
                 # ลบไฟล์ Zip ทิ้งหลังจากติดตั้งเสร็จ (เพื่อความสะอาด)
                 rm -f "$LOCAL_DOWNLOAD_DEST"
             else
