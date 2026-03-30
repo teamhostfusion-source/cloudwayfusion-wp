@@ -2,7 +2,7 @@
 
 USER_HOME="$HOME"
 PLUGIN_SLUG="blocksy-companion-pro"
-GITHUB_URL="https://raw.githubusercontent.com/teamhostfusion-source/cloudwayfusion-wp/main/blocksy-companion-pro.zip"
+GITHUB_URL="https://github.com/teamhostfusion-source/cloudwayfusion-wp/raw/main/blocksy-companion-pro.zip"
 
 TEMP_ZIP_NAME="${PLUGIN_SLUG}_temp.zip"
 DOWNLOAD_DEST="$USER_HOME/$TEMP_ZIP_NAME"
