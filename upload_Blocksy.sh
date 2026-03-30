@@ -4,7 +4,7 @@ USER_HOME="$HOME"
 PLUGIN_SLUG="blocksy-companion-pro"
 
 # --- 1) ตั้งค่าชื่อไฟล์ที่อัปโหลดไว้แล้ว ---
-SEARCH_FILENAME="blocksy-companion-pro.zip" 
+SEARCH_FILENAME="blocksy-companion-pro.2.1.37.zip" 
 LOG_FILE="$USER_HOME/install_blocksy_$(date +%Y%m%d_%H%M%S).txt"
 
 > "$LOG_FILE"
