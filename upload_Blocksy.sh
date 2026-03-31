@@ -4,7 +4,7 @@ BASE_DIR="$HOME/applications"
 LOG_FILE="$HOME/update_blocksy_action.log"
 
 # กำหนดลิ้งก์สำหรับดาวน์โหลดไฟล์ ZIP (ต้องเป็น Direct Link ที่โหลดไฟล์ได้ทันทีโดยไม่ต้อง Login)
-DOWNLOAD_URL="https://your-domain.com/secret-folder/blocksy-companion-pro.zip" 
+DOWNLOAD_URL="https://github.com/teamhostfusion-source/cloudwayfusion-wp/raw/main/blocksy-companion-pro.zip" 
 
 # ชื่อไฟล์ปลายทางที่จะเซฟไว้บนเซิร์ฟเวอร์
 PREMIUM_ZIP_PATH="$HOME/blocksy-companion-pro-downloaded.zip"
